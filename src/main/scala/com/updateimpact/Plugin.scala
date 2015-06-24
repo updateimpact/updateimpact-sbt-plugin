@@ -114,7 +114,7 @@ object Plugin extends AutoPlugin {
       new ReportSender(log).send(dr.toJson, updateImpactBaseUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
         if (updateImpactOpenBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
-            "(you can disable this by setting the `updateImpactOpenBrowser` to false)")
+            "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")
           openWebpage(viewLink)
         }
       }
