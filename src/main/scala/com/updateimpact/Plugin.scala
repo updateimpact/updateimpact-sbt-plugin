@@ -92,7 +92,7 @@ object Plugin extends AutoPlugin {
       apiKey,
       updateImpactBuildId.value.toString,
       "1.0",
-      moduleDependencies.toSet)
+      FixInterProjectDependencies(moduleDependencies.toSet))
   }
 
   override def projectSettings = Seq(

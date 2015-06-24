@@ -7,8 +7,8 @@ import sbt.{Artifact, Logger}
 import scala.xml.{Node, XML}
 
 class ParseIvyReport(log: Logger) {
-  case class Caller(org: String, name: String, rev: String)
-  case class Revision(id: DependencyId, evictedBy: Option[String], callers: List[Caller]) {
+  private case class Caller(org: String, name: String, rev: String)
+  private case class Revision(id: DependencyId, evictedBy: Option[String], callers: List[Caller]) {
     def toDependencyChild = DependencyChild(id, evictedBy)
   }
 
