@@ -17,6 +17,8 @@ object FixInterProjectDependencies {
 
     moduleDependencies.map(md =>
       md.copy(dependencies = md.dependencies.map(d =>
-        d.copy(dependencies = d.dependencies.map(dc => dc.copy(id = fixId(dc.id)))))))
+        d.copy(
+          id = fixId(d.id),
+          dependencies = d.dependencies.map(dc => dc.copy(id = fixId(dc.id)))))))
   }
 }
