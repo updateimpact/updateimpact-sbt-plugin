@@ -7,7 +7,7 @@ import java.util.UUID
 import sbt._
 import sbt.Keys._
 
-object UpdateimpactSbtPlugin extends AutoPlugin {
+object Plugin extends AutoPlugin {
   object autoImport {
     val updateImpactApiKey = settingKey[String]("The api key to access UpdateImpact")
 
@@ -32,6 +32,8 @@ object UpdateimpactSbtPlugin extends AutoPlugin {
     val updateImpactDependencies = taskKey[Unit]("Send the dependency report to UpdateImpact for all projects " +
       "and optionally open the browser with the results")
   }
+
+  val apiKey = autoImport.updateImpactApiKey
 
   import autoImport._
 
