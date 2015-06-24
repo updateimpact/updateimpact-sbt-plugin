@@ -11,7 +11,7 @@ object UpdateimpactSbtPlugin extends AutoPlugin {
   object autoImport {
     val updateImpactApiKey = settingKey[String]("The api key to access UpdateImpact")
 
-    val updateImpactUrl = settingKey[String]("The base UpdateImpact URL")
+    val updateImpactBaseUrl = settingKey[String]("The base UpdateImpact URL")
 
     val updateImpactSubmitUrl = settingKey[String]("The URL where results will be submitted")
 
@@ -19,6 +19,8 @@ object UpdateimpactSbtPlugin extends AutoPlugin {
       "opened with the results after the build completes")
 
     val updateImpactBuildId = settingKey[UUID]("Unique id of this build")
+
+    val updateImpactRootProjectId = taskKey[String]("The id of the root project, from which the name and apikeys are taken")
 
     val updateImpactIvyReport = taskKey[File]("Returns the path to the ivy report with the dependency graph")
 
@@ -64,21 +66,23 @@ object UpdateimpactSbtPlugin extends AutoPlugin {
     new ParseIvyReport(streams.value.log).parse(updateImpactIvyReport.value, artifact.value)
   }
 
-  val dependencyReportImpl = updateImpactDependencyReport := {
-    val moduleDependencies = updateImpactModuleDependencies.all(ScopeFilter(inAnyProject)).value
-
+  val rootProjectIdImpl = updateImpactRootProjectId := {
     // Trying to find the "root project" using a heuristic: from all the projects that aggregate other projects,
     // looking for the one with the shortest path (longer paths probably mean subprojects).
     val allProjects = buildStructure.value.allProjects
     val withAggregate = allProjects.filter(_.aggregate.nonEmpty)
-    val rootProjectId = (if (withAggregate.nonEmpty) withAggregate else allProjects)
+    (if (withAggregate.nonEmpty) withAggregate else allProjects)
       .sortBy(_.base.getAbsolutePath.length)
       .head
       .id
+  }
+
+  val dependencyReportImpl = updateImpactDependencyReport := {
+    val moduleDependencies = updateImpactModuleDependencies.all(ScopeFilter(inAnyProject)).value
 
     val Some((_, (rootProjectName, apiKey))) = thisProject.zip(name.zip(updateImpactApiKey))
       .all(ScopeFilter(inAnyProject)).value
-      .find(_._1.id == rootProjectId)
+      .find(_._1.id == updateImpactRootProjectId.value)
     if (apiKey == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
 
     DependencyReport(
@@ -96,15 +100,16 @@ object UpdateimpactSbtPlugin extends AutoPlugin {
 
   override def buildSettings = Seq(
     updateImpactApiKey := "",
-    updateImpactUrl := "https://app.updateimpact.com",
-    updateImpactSubmitUrl := updateImpactUrl.value + "/rest/submit",
+    updateImpactBaseUrl := "https://app.updateimpact.com",
+    updateImpactSubmitUrl := updateImpactBaseUrl.value + "/rest/submit",
     updateImpactOpenBrowser := true,
     updateImpactBuildId := UUID.randomUUID(),
+    rootProjectIdImpl,
     dependencyReportImpl,
     updateImpactDependencies := {
       val log = streams.value.log
       val dr = updateImpactDependencyReport.value
-      new ReportSender(log).send(dr.toJson, updateImpactUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
+      new ReportSender(log).send(dr.toJson, updateImpactBaseUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
         if (updateImpactOpenBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting the `updateImpactOpenBrowser` to false)")
