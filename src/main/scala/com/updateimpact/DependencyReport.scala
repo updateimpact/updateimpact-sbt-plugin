@@ -12,7 +12,7 @@ case class DependencyReport(projectName: String, apikey: String, buildId: String
   }
 }
 
-case class ModuleDependencies(moduleId: DependencyId, dependencies: Set[Dependency])
+case class ModuleDependencies(moduleId: DependencyId, config: String, dependencies: Set[Dependency])
 
 case class Dependency(id: DependencyId, dependencies: Set[DependencyChild] = Set())
 

@@ -20,12 +20,14 @@ object Plugin extends AutoPlugin {
 
     val updateImpactBuildId = settingKey[UUID]("Unique id of this build")
 
+    val updateImpactConfigs = settingKey[List[Configuration]]("Configurations for which to generate and submit dependencies")
+
     val updateImpactRootProjectId = taskKey[String]("The id of the root project, from which the name and apikeys are taken")
 
-    val updateImpactIvyReport = taskKey[File]("Returns the path to the ivy report with the dependency graph")
+    val updateImpactIvyReports = taskKey[Map[Configuration, File]]("Returns the paths to the ivy reports with the dependency graphs")
 
-    val updateImpactModuleDependencies = taskKey[ModuleDependencies]("Parse the ivy report to create a description " +
-      "of the dependencies of the current project")
+    val updateImpactModuleDependencies = taskKey[Set[ModuleDependencies]]("Parse the ivy reports to create descriptions " +
+      "of the dependencies of the current project in the given configurations")
 
     val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
@@ -37,7 +39,7 @@ object Plugin extends AutoPlugin {
 
   import autoImport._
 
-  val ivyReportImpl = updateImpactIvyReport := {
+  val ivyReportsImpl = updateImpactIvyReports := {
     // based on https://github.com/jrudolph/sbt-dependency-graph
     type HasModule = {
       val module: ModuleID
@@ -53,19 +55,26 @@ object Plugin extends AutoPlugin {
     // generates the report
     update.value
 
-    val config = Compile
+    val configs = updateImpactConfigs.value
 
-    val reportName = s"${projectID.value.organization}-${ivyModuleName(ivyModule.value)}-${config.name}.xml"
-    val report = target.value / "resolution-cache" / "reports" / reportName
-    if (!report.exists()) {
-      throw new IllegalStateException(s"Cannot find ivy report at $report!")
+    val reports = configs.map { c =>
+      val reportName = s"${projectID.value.organization}-${ivyModuleName(ivyModule.value)}-${c.name}.xml"
+      val report = target.value / "resolution-cache" / "reports" / reportName
+
+      if (!report.exists()) {
+        throw new IllegalStateException(s"Cannot find ivy report at $report!")
+      }
+      c -> report
     }
 
-    report
+    reports.toMap
   }
 
   val moduleDependenciesImpl = updateImpactModuleDependencies := {
-    new ParseIvyReport(streams.value.log).parse(updateImpactIvyReport.value, artifact.value)
+    val ar = artifact.value
+    updateImpactIvyReports.value.map { case (config, report) =>
+      new ParseIvyReport(streams.value.log).parse(report, ar, config)
+    }.toSet
   }
 
   val rootProjectIdImpl = updateImpactRootProjectId := {
@@ -80,7 +89,7 @@ object Plugin extends AutoPlugin {
   }
 
   val dependencyReportImpl = updateImpactDependencyReport := {
-    val moduleDependencies = updateImpactModuleDependencies.all(ScopeFilter(inAnyProject)).value
+    val moduleDependencies = updateImpactModuleDependencies.all(ScopeFilter(inAnyProject)).value.toSet.flatten
 
     val Some((_, (rootProjectName, apiKey))) = thisProject.zip(name.zip(updateImpactApiKey))
       .all(ScopeFilter(inAnyProject)).value
@@ -92,11 +101,11 @@ object Plugin extends AutoPlugin {
       apiKey,
       updateImpactBuildId.value.toString,
       "1.0",
-      FixInterProjectDependencies(moduleDependencies.toSet))
+      FixInterProjectDependencies(moduleDependencies))
   }
 
   override def projectSettings = Seq(
-    ivyReportImpl,
+    ivyReportsImpl,
     moduleDependenciesImpl
   )
 
@@ -106,6 +115,7 @@ object Plugin extends AutoPlugin {
     updateImpactSubmitUrl := updateImpactBaseUrl.value + "/rest/submit",
     updateImpactOpenBrowser := true,
     updateImpactBuildId := UUID.randomUUID(),
+    updateImpactConfigs := List(Compile, Test),
     rootProjectIdImpl,
     dependencyReportImpl,
     updateImpactDependencies := {

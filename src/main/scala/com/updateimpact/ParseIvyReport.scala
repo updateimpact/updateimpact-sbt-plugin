@@ -2,7 +2,7 @@ package com.updateimpact
 
 import java.io.File
 
-import sbt.{Artifact, Logger}
+import sbt.{Configuration, Artifact, Logger}
 
 import scala.xml.{Node, XML}
 
@@ -12,7 +12,7 @@ class ParseIvyReport(log: Logger) {
     def toDependencyChild = DependencyChild(id, evictedBy)
   }
 
-  def parse(report: File, artifact: Artifact): ModuleDependencies = {
+  def parse(report: File, artifact: Artifact, config: Configuration): ModuleDependencies = {
     val root = XML.loadFile(report)
     val revisions = extractRevisions(root)
 
@@ -34,7 +34,7 @@ class ParseIvyReport(log: Logger) {
     }
       .toSet
 
-    ModuleDependencies(rootId, dependencies)
+    ModuleDependencies(rootId, config.name, dependencies)
   }
 
   private def extractRootId(root: Node, artifact: Artifact): DependencyId = {
