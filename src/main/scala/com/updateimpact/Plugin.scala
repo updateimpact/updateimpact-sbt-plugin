@@ -36,6 +36,7 @@ object Plugin extends AutoPlugin {
   }
 
   val apiKey = autoImport.updateImpactApiKey
+  val openBrowser = autoImport.updateImpactOpenBrowser
 
   import autoImport._
 
