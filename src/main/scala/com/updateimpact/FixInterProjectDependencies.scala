@@ -1,7 +1,7 @@
 package com.updateimpact
 
 /**
- * If a project depends on a project, the dependency childs id won't have the "type" set properly.
+ * If a project depends on a project, the dependency ids and child ids won't have the "type" set properly.
  * For the graph to be shown properly, this must be amended.
  */
 object FixInterProjectDependencies {
