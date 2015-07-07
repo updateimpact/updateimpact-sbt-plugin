@@ -31,7 +31,7 @@ object Plugin extends AutoPlugin {
 
     val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
-    val updateImpactDependencies = taskKey[Unit]("Send the dependency report to UpdateImpact for all projects " +
+    val updateImpactSubmit = taskKey[Unit]("Submit the dependency report to UpdateImpact for all projects " +
       "and optionally open the browser with the results")
   }
 
@@ -119,10 +119,10 @@ object Plugin extends AutoPlugin {
     updateImpactConfigs := List(Compile, Test),
     rootProjectIdImpl,
     dependencyReportImpl,
-    updateImpactDependencies := {
+    updateImpactSubmit := {
       val log = streams.value.log
       val dr = updateImpactDependencyReport.value
-      new ReportSender(log).send(dr.toJson, updateImpactBaseUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
+      new ReportSubmitter(log).submit(dr.toJson, updateImpactBaseUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
         if (updateImpactOpenBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")

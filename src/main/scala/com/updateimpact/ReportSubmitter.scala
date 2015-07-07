@@ -6,8 +6,8 @@ import org.apache.http.impl.client.HttpClientBuilder
 import org.apache.http.util.EntityUtils
 import sbt.Logger
 
-class ReportSender(log: Logger) {
-  def send(report: String, baseUrl: String, submitUrl: String): Option[String] = {
+class ReportSubmitter(log: Logger) {
+  def submit(report: String, baseUrl: String, submitUrl: String): Option[String] = {
     log.info("")
     log.info(s"Submitting dependency report to: $submitUrl")
 
