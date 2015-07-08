@@ -113,7 +113,7 @@ object Plugin extends AutoPlugin {
   override def buildSettings = Seq(
     updateImpactApiKey := "",
     updateImpactBaseUrl := "https://app.updateimpact.com",
-    updateImpactSubmitUrl := updateImpactBaseUrl.value + "/rest/submit",
+    updateImpactSubmitUrl := updateImpactBaseUrl.value + "/api/submit",
     updateImpactOpenBrowser := true,
     updateImpactBuildId := UUID.randomUUID(),
     updateImpactConfigs := List(Compile, Test),
