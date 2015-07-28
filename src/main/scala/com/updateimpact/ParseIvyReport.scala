@@ -3,13 +3,14 @@ package com.updateimpact
 import java.io.File
 
 import sbt.{Configuration, Artifact, Logger}
+import scala.collection.JavaConversions._
 
 import scala.xml.{Node, XML}
 
 class ParseIvyReport(log: Logger) {
   private case class Caller(org: String, name: String, rev: String)
   private case class Revision(id: DependencyId, evictedBy: Option[String], callers: List[Caller]) {
-    def toDependencyChild = DependencyChild(id, evictedBy)
+    def toDependencyChild = new DependencyChild(id, evictedBy.orNull, null)
   }
 
   def parse(report: File, artifact: Artifact, config: Configuration): ModuleDependencies = {
@@ -30,21 +31,21 @@ class ParseIvyReport(log: Logger) {
     }
       .groupBy(_._1)
       .map { case (id, idAndChildren) =>
-        Dependency(id, idAndChildren.map(_._2).toSet)
+        new Dependency(id, idAndChildren.map(_._2).toList)
     }
       .toSet
 
-    ModuleDependencies(rootId, config.name, dependencies)
+    new ModuleDependencies(rootId, config.name, dependencies)
   }
 
   private def extractRootId(root: Node, artifact: Artifact): DependencyId = {
     val info = (root \ "info").head
-    DependencyId(
+    new DependencyId(
       info.attribute("organisation").get.text,
       info.attribute("module").get.text,
       info.attribute("revision").get.text,
-      Some(artifact.`type`),
-      artifact.classifier
+      artifact.`type`,
+      artifact.classifier.orNull
     )
   }
 
@@ -56,12 +57,12 @@ class ParseIvyReport(log: Logger) {
       revision <- module \ "revision"
     } yield {
         val artifact = (revision \ "artifacts" \ "artifact").headOption
-        val id = DependencyId(
+        val id = new DependencyId(
           org,
           name,
           revision.attribute("name").get.text,
-          artifact.flatMap(_.attribute("type")).map(_.text),
-          artifact.flatMap(_.attribute("classifier")).map(_.text))
+          artifact.flatMap(_.attribute("type")).map(_.text).orNull,
+          artifact.flatMap(_.attribute("classifier")).map(_.text).orNull)
 
         val evictedBy = (revision \ "evicted-by").headOption.flatMap(_.attribute("rev")).map(_.text)
 
@@ -92,5 +93,5 @@ class ParseIvyReport(log: Logger) {
     callerToId
   }
 
-  private def callerToIdMapping(id: DependencyId) = Caller(id.groupId, id.artifactId, id.version) -> id
+  private def callerToIdMapping(id: DependencyId) = Caller(id.getGroupId, id.getArtifactId, id.getVersion) -> id
 }

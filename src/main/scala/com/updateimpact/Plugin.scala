@@ -4,16 +4,17 @@ import java.awt.Desktop
 import java.net.URI
 import java.util.UUID
 
+import com.google.gson.Gson
 import sbt._
 import sbt.Keys._
+
+import scala.collection.JavaConversions._
 
 object Plugin extends AutoPlugin {
   object autoImport {
     val updateImpactApiKey = settingKey[String]("The api key to access UpdateImpact")
 
     val updateImpactBaseUrl = settingKey[String]("The base UpdateImpact URL")
-
-    val updateImpactSubmitUrl = settingKey[String]("The URL where results will be submitted")
 
     val updateImpactOpenBrowser = settingKey[Boolean]("Should the default browser be " +
       "opened with the results after the build completes")
@@ -97,12 +98,13 @@ object Plugin extends AutoPlugin {
       .find(_._1.id == updateImpactRootProjectId.value)
     if (apiKey == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
 
-    DependencyReport(
+    new DependencyReport(
       rootProjectName,
       apiKey,
       updateImpactBuildId.value.toString,
+      FixInterProjectDependencies(moduleDependencies),
       "1.0",
-      FixInterProjectDependencies(moduleDependencies))
+      "sbt-plugin-1.0.4")
   }
 
   override def projectSettings = Seq(
@@ -113,16 +115,20 @@ object Plugin extends AutoPlugin {
   override def buildSettings = Seq(
     updateImpactApiKey := "",
     updateImpactBaseUrl := "https://app.updateimpact.com",
-    updateImpactSubmitUrl := updateImpactBaseUrl.value + "/api/submit",
     updateImpactOpenBrowser := true,
     updateImpactBuildId := UUID.randomUUID(),
     updateImpactConfigs := List(Compile, Test),
     rootProjectIdImpl,
     dependencyReportImpl,
     updateImpactSubmit := {
-      val log = streams.value.log
+      val slog = streams.value.log
+      val log = new SubmitLogger {
+        override def error(message: String) = slog.error(message)
+        override def info(message: String) = slog.info(message)
+      }
       val dr = updateImpactDependencyReport.value
-      new ReportSubmitter(log).submit(dr.toJson, updateImpactBaseUrl.value, updateImpactSubmitUrl.value).foreach { viewLink =>
+      val reportJson = new Gson().toJson(dr)
+      Option(new ReportSubmitter(updateImpactBaseUrl.value, log).trySubmitReport(reportJson)).foreach { viewLink =>
         if (updateImpactOpenBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")
