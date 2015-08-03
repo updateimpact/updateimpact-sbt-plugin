@@ -2,13 +2,14 @@ package com.updateimpact
 
 import java.awt.Desktop
 import java.net.URI
-import java.util.UUID
+import java.util.{Collections, UUID}
 
-import com.google.gson.Gson
+import com.updateimpact.report._
 import sbt._
 import sbt.Keys._
 
 import scala.collection.JavaConversions._
+import scala.xml.XML
 
 object Plugin extends AutoPlugin {
   object autoImport {
@@ -25,10 +26,9 @@ object Plugin extends AutoPlugin {
 
     val updateImpactRootProjectId = taskKey[String]("The id of the root project, from which the name and apikeys are taken")
 
-    val updateImpactIvyReports = taskKey[Map[Configuration, File]]("Returns the paths to the ivy reports with the dependency graphs")
+    val updateImpactIvyReportFiles = taskKey[Map[Configuration, File]]("Returns the paths to the ivy reports with the dependency graphs")
 
-    val updateImpactModuleDependencies = taskKey[Set[ModuleDependencies]]("Parse the ivy reports to create descriptions " +
-      "of the dependencies of the current project in the given configurations")
+    val updateImpactIvyReports = taskKey[List[ModuleIvyReport]]("Returns the ivy reports")
 
     val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
@@ -41,7 +41,7 @@ object Plugin extends AutoPlugin {
 
   import autoImport._
 
-  val ivyReportsImpl = updateImpactIvyReports := {
+  val ivyReportFilesImpl = updateImpactIvyReportFiles := {
     // based on https://github.com/jrudolph/sbt-dependency-graph
     type HasModule = {
       val module: ModuleID
@@ -72,11 +72,24 @@ object Plugin extends AutoPlugin {
     reports.toMap
   }
 
-  val moduleDependenciesImpl = updateImpactModuleDependencies := {
+  val ivyReportsImpl = updateImpactIvyReports := {
     val ar = artifact.value
-    updateImpactIvyReports.value.map { case (config, report) =>
-      new ParseIvyReport(streams.value.log).parse(report, ar, config)
-    }.toSet
+    updateImpactIvyReportFiles.value.map { case (config, report) =>
+      ModuleIvyReport.newWithCompressedReport(extractRootId(report, ar), config.name, report)
+    }.toList
+  }
+
+  private def extractRootId(report: File, artifact: Artifact): DependencyId = {
+    val root = XML.loadFile(report)
+
+    val info = (root \ "info").head
+    new DependencyId(
+      info.attribute("organisation").get.text,
+      info.attribute("module").get.text,
+      info.attribute("revision").get.text,
+      artifact.`type`,
+      artifact.classifier.orNull
+    )
   }
 
   val rootProjectIdImpl = updateImpactRootProjectId := {
@@ -91,7 +104,7 @@ object Plugin extends AutoPlugin {
   }
 
   val dependencyReportImpl = updateImpactDependencyReport := {
-    val moduleDependencies = updateImpactModuleDependencies.all(ScopeFilter(inAnyProject)).value.toSet.flatten
+    val ivyReports = updateImpactIvyReports.all(ScopeFilter(inAnyProject)).value.flatten
 
     val Some((_, (rootProjectName, apiKey))) = thisProject.zip(name.zip(updateImpactApiKey))
       .all(ScopeFilter(inAnyProject)).value
@@ -102,14 +115,15 @@ object Plugin extends AutoPlugin {
       rootProjectName,
       apiKey,
       updateImpactBuildId.value.toString,
-      FixInterProjectDependencies(moduleDependencies),
+      Collections.emptyList(),
+      ivyReports,
       "1.0",
-      "sbt-plugin-1.0.4")
+      "sbt-plugin-1.0.5")
   }
 
   override def projectSettings = Seq(
-    ivyReportsImpl,
-    moduleDependenciesImpl
+    ivyReportFilesImpl,
+    ivyReportsImpl
   )
 
   override def buildSettings = Seq(
@@ -127,8 +141,7 @@ object Plugin extends AutoPlugin {
         override def info(message: String) = slog.info(message)
       }
       val dr = updateImpactDependencyReport.value
-      val reportJson = new Gson().toJson(dr)
-      Option(new ReportSubmitter(updateImpactBaseUrl.value, log).trySubmitReport(reportJson)).foreach { viewLink =>
+      Option(new ReportSubmitter(updateImpactBaseUrl.value, log).trySubmitReport(dr)).foreach { viewLink =>
         if (updateImpactOpenBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")

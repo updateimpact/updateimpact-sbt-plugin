@@ -2,13 +2,11 @@ organization := "com.updateimpact"
 
 name := "updateimpact-sbt-plugin"
 
-version := "1.0.4"
+version := "1.0.5-SNAPSHOT"
 
 sbtPlugin := true
 
-libraryDependencies += "com.propensive" %% "rapture-json-json4s" % "1.1.0"
-
-libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.0.0"
+libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.1.1"
 
 // Sonatype OSS deployment
 publishTo <<= version { (v: String) =>
