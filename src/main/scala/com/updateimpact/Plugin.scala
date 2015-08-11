@@ -75,7 +75,7 @@ object Plugin extends AutoPlugin {
   val ivyReportsImpl = updateImpactIvyReports := {
     val ar = artifact.value
     updateImpactIvyReportFiles.value.map { case (config, report) =>
-      ModuleIvyReport.newWithCompressedReport(extractRootId(report, ar), config.name, report)
+      ModuleIvyReport.newWithReport(extractRootId(report, ar), config.name, report)
     }.toList
   }
 
