@@ -38,6 +38,8 @@ object Plugin extends AutoPlugin {
 
   val apiKey = autoImport.updateImpactApiKey
   val openBrowser = autoImport.updateImpactOpenBrowser
+  val configs = autoImport.updateImpactConfigs
+  val baseUrl = autoImport.updateImpactBaseUrl
 
   import autoImport._
 
@@ -118,7 +120,7 @@ object Plugin extends AutoPlugin {
       Collections.emptyList(),
       ivyReports,
       "1.0",
-      "sbt-plugin-1.0.8")
+      "sbt-plugin-1.0.9")
   }
 
   override def projectSettings = Seq(

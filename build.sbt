@@ -2,11 +2,11 @@ organization := "com.updateimpact"
 
 name := "updateimpact-sbt-plugin"
 
-version := "1.0.8"
+version := "1.0.9"
 
 sbtPlugin := true
 
-libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.3.0"
+libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.3.1"
 
 // Sonatype OSS deployment
 publishTo <<= version { (v: String) =>
