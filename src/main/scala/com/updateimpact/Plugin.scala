@@ -61,14 +61,18 @@ object Plugin extends AutoPlugin {
 
     val configs = updateImpactConfigs.value
 
-    val reports = configs.map { c =>
+    val reports: List[(Configuration, File)] = configs.flatMap { c =>
       val reportName = s"${projectID.value.organization}-${ivyModuleName(ivyModule.value)}-${c.name}.xml"
       val report = target.value / "resolution-cache" / "reports" / reportName
 
       if (!report.exists()) {
-        throw new IllegalStateException(s"Cannot find ivy report at $report!")
+        streams.value.log.warn(s"Cannot find ivy report for project ${name.value} and configuration " +
+          s"$c at path $report")
+
+        None
+      } else {
+        Some(c -> report)
       }
-      c -> report
     }
 
     reports.toMap
