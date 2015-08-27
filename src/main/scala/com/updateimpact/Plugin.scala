@@ -120,7 +120,7 @@ object Plugin extends AutoPlugin {
       Collections.emptyList(),
       ivyReports,
       "1.0",
-      "sbt-plugin-1.0.9")
+      s"sbt-plugin-${UpdateimpactSbtBuildInfo.version}")
   }
 
   override def projectSettings = Seq(

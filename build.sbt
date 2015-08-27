@@ -40,3 +40,9 @@ pomExtra := (
 licenses := ("Apache2", new java.net.URL("http://www.apache.org/licenses/LICENSE-2.0.txt")) :: Nil
 
 homepage := Some(new java.net.URL("http://updateimpact.com"))
+
+enablePlugins(BuildInfoPlugin)
+
+buildInfoPackage := "com.updateimpact"
+
+buildInfoObject := "UpdateimpactSbtBuildInfo"
