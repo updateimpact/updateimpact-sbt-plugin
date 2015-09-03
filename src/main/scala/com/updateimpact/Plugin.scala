@@ -41,8 +41,6 @@ object Plugin extends AutoPlugin {
   val dependencies = taskKey[List[ModuleDependencies]]("Compute module dependencies for a single project")
   val dependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
-  import autoImport._
-
   val ivyEntry = taskKey[(ModuleID, ModuleRevisionId)]("")
   val ivyEntryImpl = ivyEntry := {
     projectID.value -> ivyModule.value.moduleDescriptor(streams.value.log).getModuleRevisionId
@@ -55,7 +53,7 @@ object Plugin extends AutoPlugin {
 
   val dependenciesImpl = dependencies := {
     val report = update.value
-    val configs = updateImpactConfigs.value.map(_.name).toSet
+    val cfgs = configs.value.map(_.name).toSet
     val log = streams.value.log
 
     ivySbt.value.withIvy(log) { ivy =>
@@ -77,7 +75,7 @@ object Plugin extends AutoPlugin {
     }
   }
 
-  val rootProjectIdImpl = updateImpactRootProjectId := {
+  val rootProjectIdImpl = rootProjectId := {
     // Trying to find the "root project" using a heuristic: from all the projects that aggregate other projects,
     // looking for the one with the shortest path (longer paths probably mean subprojects).
     val allProjects = buildStructure.value.allProjects
@@ -89,17 +87,17 @@ object Plugin extends AutoPlugin {
   }
 
   val dependencyReportImpl = dependencyReport := {
-    val Some((_, (rootProjectName, apiKey))) = thisProject.zip(name.zip(updateImpactApiKey))
+    val Some((_, (rootProjectName, ak))) = thisProject.zip(name.zip(apiKey))
       .all(ScopeFilter(inAnyProject)).value
-      .find(_._1.id == updateImpactRootProjectId.value)
-    if (apiKey == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
+      .find(_._1.id == rootProjectId.value)
+    if (ak == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
 
     val moduleDependencies = dependencies.all(ScopeFilter(inAnyProject)).value.flatten
 
     new DependencyReport(
       rootProjectName,
-      apiKey,
-      updateImpactBuildId.value.toString,
+      ak,
+      buildId.value.toString,
       moduleDependencies.asJavaCollection,
       Collections.emptyList(),
       "1.0",
@@ -127,8 +125,8 @@ object Plugin extends AutoPlugin {
         override def info(message: String) = slog.info(message)
       }
       val dr = dependencyReport.value
-      Option(new ReportSubmitter(updateImpactBaseUrl.value, log).trySubmitReport(dr)).foreach { viewLink =>
-        if (updateImpactOpenBrowser.value) {
+      Option(new ReportSubmitter(baseUrl.value, log).trySubmitReport(dr)).foreach { viewLink =>
+        if (openBrowser.value) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")
           openWebpage(viewLink)
