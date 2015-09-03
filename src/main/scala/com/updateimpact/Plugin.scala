@@ -41,14 +41,16 @@ object Plugin extends AutoPlugin {
   val dependencies = taskKey[List[ModuleDependencies]]("Compute module dependencies for a single project")
   val dependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
-  val ivyEntry = taskKey[(ModuleID, ModuleRevisionId)]("")
-  val ivyEntryImpl = ivyEntry := {
+  // We need a mapping from SBT's ModuleIDs, where for the projects in the build the artifact names do not contain
+  // the _2.11 (scala version) suffix, to the artifact name that is used in Ivy (with the suffix)
+  private val projectIdToIvyIdEntry = taskKey[(ModuleID, ModuleRevisionId)]("")
+  private val projectIdToIvyIdEntryImpl = projectIdToIvyIdEntry := {
     projectID.value -> ivyModule.value.moduleDescriptor(streams.value.log).getModuleRevisionId
   }
 
-  val ivyMap = taskKey[Map[ModuleID, ModuleRevisionId]]("")
-  val ivyMapImpl = ivyMap := {
-    ivyEntry.all(ScopeFilter(inAnyProject)).value.toMap
+  private val projectIdToIvyId = taskKey[Map[ModuleID, ModuleRevisionId]]("")
+  private val projectIdToIvyIdImpl = projectIdToIvyId := {
+    projectIdToIvyIdEntry.all(ScopeFilter(inAnyProject)).value.toMap
   }
 
   val dependenciesImpl = dependencies := {
@@ -58,7 +60,7 @@ object Plugin extends AutoPlugin {
 
     ivySbt.value.withIvy(log) { ivy =>
 
-      val im = ivyMap.value
+      val im = projectIdToIvyId.value
 
       val md = new CreateModuleDependencies(
         ivy,
@@ -106,8 +108,8 @@ object Plugin extends AutoPlugin {
 
   override def projectSettings = Seq(
     dependenciesImpl,
-    ivyEntryImpl,
-    ivyMapImpl
+    projectIdToIvyIdEntryImpl,
+    projectIdToIvyIdImpl
   )
 
   override def buildSettings = Seq(
