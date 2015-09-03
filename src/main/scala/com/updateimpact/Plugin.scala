@@ -59,16 +59,12 @@ object Plugin extends AutoPlugin {
     val log = streams.value.log
 
     ivySbt.value.withIvy(log) { ivy =>
-
-      val im = projectIdToIvyId.value
-
       val md = new CreateModuleDependencies(
         ivy,
-        new FindDependencyDescriptors(ivy),
         log)
         .forClasspath(
           ivyModule.value.moduleDescriptor(streams.value.log),
-          im,
+          projectIdToIvyId.value,
           (classpathConfiguration in Compile).value,
           (fullClasspath in Compile).value
         )

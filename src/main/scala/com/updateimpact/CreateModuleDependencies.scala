@@ -9,9 +9,10 @@ import sbt.{Configurations, Configuration, ModuleID, Logger}
 import scala.collection.JavaConversions._
 import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg}
 
-class CreateModuleDependencies(ivy: Ivy, fdd: FindDependencyDescriptors, log: Logger) {
+class CreateModuleDependencies(ivy: Ivy, log: Logger) {
+  private val fdd = new FindDependencyDescriptors(ivy)
 
-  def forClasspath(rootMd: ModuleDescriptor, im: Map[ModuleID, ModuleRevisionId], cfg: Configuration, cp: Classpath): ModuleDependencies = {
+  def forClasspath(rootMd: ModuleDescriptor, projectIdToIvyId: Map[ModuleID, ModuleRevisionId], cfg: Configuration, cp: Classpath): ModuleDependencies = {
 
     val includedConfigs = getConfigsClosure(cfg.name, rootMd.getConfigurations)
     val includedConfigsWithoutOptional = includedConfigs - Configurations.Optional.name
@@ -20,7 +21,8 @@ class CreateModuleDependencies(ivy: Ivy, fdd: FindDependencyDescriptors, log: Lo
     val (classpathDepIds, depsWithoutModuleIDs) = cp.foldLeft((List.empty[DependencyId], List.empty[DependencyId])) { case ((cdids, dwmis), f) =>
       f.metadata.get(moduleID.key) match {
         case Some(mid) =>
-          val id = im.get(mid).map(toDepId).getOrElse(toDepId(mid))
+          // If it's a project in this build, we need the special translation which adds the scala version suffix.
+          val id = projectIdToIvyId.get(mid).map(toDepId).getOrElse(toDepId(mid))
           (id :: cdids, dwmis)
         case None =>
           val depName = f.data.getName
