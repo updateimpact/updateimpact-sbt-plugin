@@ -49,15 +49,7 @@ class CreateModuleDependencies(ivy: Ivy, fdd: FindDependencyDescriptors, log: Lo
           log.warn(s"Cannot get dependencies for module ${id.toStr}")
           Nil
         case Some(ds) =>
-          println("--- " + id.toStr)
           val r = ds.filter { d =>
-//            println(d.getDependencyRevisionId)
-//            println(d.getDependencyConfigurations("compile").toList)
-//            println(d.getDependencyConfigurations(cfg.name).toList)
-//            println(d.getModuleConfigurations.toList)
-//            println("-")
-//            d.getDependencyConfigurations(cfg.name).nonEmpty
-
             // include optional deps only for the root
             val included = if (id == rootId) includedConfigs else includedConfigsWithoutOptional
             included.intersect(d.getModuleConfigurations.toSet).nonEmpty
@@ -76,30 +68,12 @@ class CreateModuleDependencies(ivy: Ivy, fdd: FindDependencyDescriptors, log: Lo
     val deps = idToDepsWithMissing.map { case (id, idDeps) =>
       val evictedBy = classpathDepVersions.get(OrgAndName(id)) match {
         case None => "exclude" // no other version present on the classpath, dep must have been excluded
-        case Some(v) if v != id.getVersion =>
-
-          println(v + " VS " + id.getVersion)
-          println(ivy.getSettings.getVersionMatcher.accept(
-            ModuleRevisionId.newInstance("x", "x", id.getVersion),
-            ModuleRevisionId.newInstance("x", "x", v)
-          ))
-
-          v
+        case Some(v) if v != id.getVersion => v
         case _ => null // not evicted, versions match
       }
 
       new Dependency(id, evictedBy, false, idDeps)
     }
-
-    //
-    println(rootId.toStr)
-    deps.foreach { d =>
-      println("   " + d.getId.toStr)
-      d.getChildren.foreach { c =>
-        println("      " + c.toStr)
-      }
-    }
-    //
 
     new ModuleDependencies(rootId, cfg.name, deps)
   }
