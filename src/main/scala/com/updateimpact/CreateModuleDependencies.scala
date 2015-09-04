@@ -12,9 +12,10 @@ import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg}
 class CreateModuleDependencies(ivy: Ivy, log: Logger) {
   private val fdd = new FindDependencyDescriptors(ivy)
 
-  def forClasspath(rootMd: ModuleDescriptor, projectIdToIvyId: Map[ModuleID, ModuleRevisionId], cfg: Configuration, cp: Classpath): ModuleDependencies = {
+  def forClasspath(rootMd: ModuleDescriptor, projectIdToIvyId: Map[ModuleID, ModuleRevisionId],
+    cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
 
-    val includedConfigs = getConfigsClosure(cfg.name, rootMd.getConfigurations)
+    val includedConfigs = getConfigsClosure(cpCfg.name, rootMd.getConfigurations)
     val includedConfigsWithoutOptional = includedConfigs - Configurations.Optional.name
 
     val rootId = toDepId(rootMd.getModuleRevisionId)

@@ -53,23 +53,27 @@ object Plugin extends AutoPlugin {
     projectIdToIvyIdEntry.all(ScopeFilter(inAnyProject)).value.toMap
   }
 
+  private val cfgWithCp = Def.taskDyn {
+    val cfgs = configs.value
+    Def.task { (configuration.value, classpathConfiguration.value, fullClasspath.value) }
+      .all(ScopeFilter(configurations = inConfigurations(cfgs: _*)))
+  }
+
   val dependenciesImpl = dependencies := {
-    val report = update.value
-    val cfgs = configs.value.map(_.name).toSet
+    update.value
+
     val log = streams.value.log
+    val md = ivyModule.value.moduleDescriptor(log)
+    val pitii = projectIdToIvyId.value
 
     ivySbt.value.withIvy(log) { ivy =>
-      val md = new CreateModuleDependencies(
-        ivy,
-        log)
-        .forClasspath(
-          ivyModule.value.moduleDescriptor(streams.value.log),
-          projectIdToIvyId.value,
-          (classpathConfiguration in Compile).value,
-          (fullClasspath in Compile).value
-        )
+      val cmd = new CreateModuleDependencies(ivy, log)
 
-      List(md)
+      (for {
+        (cfg, cpCfg, cp) <- cfgWithCp.value
+      } yield {
+          cmd.forClasspath(md, pitii, cfg, cpCfg, cp)
+        }).toList
     }
   }
 
@@ -113,7 +117,7 @@ object Plugin extends AutoPlugin {
     baseUrl := "https://app.updateimpact.com",
     openBrowser := true,
     buildId := UUID.randomUUID(),
-    configs := List(Compile, Test),
+    configs := List(Compile, Test, Runtime),
     rootProjectIdImpl,
     dependencyReportImpl,
     submit := {
