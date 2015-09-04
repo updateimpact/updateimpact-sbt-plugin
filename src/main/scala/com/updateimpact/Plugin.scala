@@ -67,12 +67,12 @@ object Plugin extends AutoPlugin {
     val pitii = projectIdToIvyId.value
 
     ivySbt.value.withIvy(log) { ivy =>
-      val cmd = new CreateModuleDependencies(ivy, log)
+      val cmd = new CreateModuleDependencies(ivy, log, md, pitii)
 
       (for {
         (cfg, cpCfg, cp) <- cfgWithCp.value
       } yield {
-          cmd.forClasspath(md, pitii, cfg, cpCfg, cp)
+          cmd.forClasspath(cfg, cpCfg, cp)
         }).toList
     }
   }
