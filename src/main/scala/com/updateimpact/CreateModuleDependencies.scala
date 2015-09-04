@@ -12,12 +12,14 @@ import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg}
 class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
   projectIdToIvyId: Map[ModuleID, ModuleRevisionId]) {
 
+  val LocalGroupId = "local"
+
   private val fdd = new FindDependencyDescriptors(ivy)
   private val rootId = toDepId(rootMd.getModuleRevisionId)
 
   def forClasspath(cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
 
-    val (classpathDepIds, depsWithoutModuleIDs) = depIdsFromClasspath(cp)
+    val (classpathDepIds, depsWithoutModuleIDs) = depIdsFromClasspath(cfg, cp)
 
     val classpathDepVersions = classpathDepIds.map { id => OrgAndName(id) -> id.getVersion }.toMap
 
@@ -32,6 +34,7 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
 
     val deps = idToDepsWithMissing.map { case (id, idDeps) =>
       val evictedBy = classpathDepVersions.get(OrgAndName(id)) match {
+        case None if id.getGroupId == LocalGroupId => null // local dependency
         case None => "exclude" // no other version present on the classpath, dep must have been excluded
         case Some(v) if v != id.getVersion => v
         case _ => null // not evicted, versions match
@@ -43,17 +46,21 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
     new ModuleDependencies(rootId, cfg.name, deps)
   }
 
-  private def depIdsFromClasspath(cp: Classpath) = {
+  private def depIdsFromClasspath(cfg: Configuration, cp: Classpath) = {
     cp.foldLeft((List.empty[DependencyId], List.empty[DependencyId])) { case ((depIds, withoutModuleId), f) =>
       f.metadata.get(moduleID.key) match {
         case Some(mid) =>
           // If it's a project in this build, we need the special translation which adds the scala version suffix.
           val id = projectIdToIvyId.get(mid).map(toDepId).getOrElse(toDepId(mid))
           (id :: depIds, withoutModuleId)
-        case None =>
+        case None if f.data.exists() =>
           val depName = f.data.getName
-          log.warn(s"Cannot find Ivy module ID for dependency $depName. Adding to the result as a top-level dependency")
-          (depIds, new DependencyId("local", depName, "?", null, null) :: withoutModuleId)
+          log.warn(s"Cannot find Ivy module ID for dependency $depName in configuration ${cfg.name}. " +
+            s"Adding to the result as a top-level dependency of ${rootId.getArtifactId}")
+          (depIds, new DependencyId(LocalGroupId, depName, "-", null, null) :: withoutModuleId)
+        case None =>
+          // local dependency which doesn't exist - not including
+          (depIds, withoutModuleId)
       }
     }
   }

@@ -60,8 +60,6 @@ object Plugin extends AutoPlugin {
   }
 
   val dependenciesImpl = dependencies := {
-    update.value
-
     val log = streams.value.log
     val md = ivyModule.value.moduleDescriptor(log)
     val pitii = projectIdToIvyId.value
