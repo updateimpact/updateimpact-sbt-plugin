@@ -1,0 +1,55 @@
+com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in compile
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:module2_2.11:0.1-SNAPSHOT in compile
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   com.softwaremill.example:module2_2.11:0.1-SNAPSHOT
+      com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT in compile
+   com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   org.scala-lang:scala-library:2.11.6com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in runtime
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:module2_2.11:0.1-SNAPSHOT in runtime
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   com.softwaremill.example:module2_2.11:0.1-SNAPSHOT
+      com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT in runtime
+   com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   org.scala-lang:scala-library:2.11.6com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in test
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:module2_2.11:0.1-SNAPSHOT in test
+   com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      log4j:log4j:1.2.11
+      org.scala-lang:scala-library:2.11.6
+   com.softwaremill.example:module2_2.11:0.1-SNAPSHOT
+      com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   log4j:log4j:1.2.11
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT in test
+   com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT
+      org.scala-lang:scala-library:2.11.6
+   org.scala-lang:scala-library:2.11.6
