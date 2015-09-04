@@ -12,8 +12,13 @@ import org.apache.ivy.core.resolve.ResolveOptions
 import org.apache.ivy.plugins.parser.xml.XmlModuleDescriptorParser
 
 class FindDependencyDescriptors(ivy: Ivy) {
-  def forDependencyId(di: DependencyId): Option[Seq[DependencyDescriptor]] = {
-    val mrid = ModuleRevisionId.newInstance(di.getGroupId, di.getArtifactId, di.getVersion)
+  /**
+   * Looks for dependencies of the given dependency in:
+   * - resolved ivy module file, in a local cache
+   * - ivy cache
+   */
+  def forDependencyId(id: DependencyId): Option[Seq[DependencyDescriptor]] = {
+    val mrid = ModuleRevisionId.newInstance(id.getGroupId, id.getArtifactId, id.getVersion)
     findModuleFromCache(mrid)
       .orElse(findModuleUsingResolveEngine(mrid))
   }
@@ -23,6 +28,10 @@ class FindDependencyDescriptors(ivy: Ivy) {
     if (!ivyFile.exists()) {
       None
     } else {
+      // If a dependency's version is specified using a range, the cached descriptor will contain the range,
+      // and the chosen specific version will be present in a separate .properties file. Hence replacing the versions
+      // for all dependencies for which the properties file has an entry.
+      
       // ResolutionCache:45
       val desc = XmlModuleDescriptorParser.getInstance().parseDescriptor(ivy.getSettings, ivyFile.toURI.toURL, false)
       val revReplacements = resolvedRevisionsFromCachedProperties(mrid)

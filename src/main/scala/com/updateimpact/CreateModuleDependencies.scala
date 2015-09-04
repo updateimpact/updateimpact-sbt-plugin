@@ -9,57 +9,19 @@ import sbt.{Configurations, Configuration, ModuleID, Logger}
 import scala.collection.JavaConversions._
 import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg}
 
-class CreateModuleDependencies(ivy: Ivy, log: Logger) {
+class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
+  projectIdToIvyId: Map[ModuleID, ModuleRevisionId]) {
+
   private val fdd = new FindDependencyDescriptors(ivy)
+  private val rootId = toDepId(rootMd.getModuleRevisionId)
 
-  def forClasspath(rootMd: ModuleDescriptor, projectIdToIvyId: Map[ModuleID, ModuleRevisionId],
-    cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
+  def forClasspath(cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
 
-    val includedConfigs = getConfigsClosure(cpCfg.name, rootMd.getConfigurations)
-    val includedConfigsWithoutOptional = includedConfigs - Configurations.Optional.name
-
-    val rootId = toDepId(rootMd.getModuleRevisionId)
-    val (classpathDepIds, depsWithoutModuleIDs) = cp.foldLeft((List.empty[DependencyId], List.empty[DependencyId])) { case ((cdids, dwmis), f) =>
-      f.metadata.get(moduleID.key) match {
-        case Some(mid) =>
-          // If it's a project in this build, we need the special translation which adds the scala version suffix.
-          val id = projectIdToIvyId.get(mid).map(toDepId).getOrElse(toDepId(mid))
-          (id :: cdids, dwmis)
-        case None =>
-          val depName = f.data.getName
-          log.warn(s"Cannot find Ivy module ID for dependency $depName. Adding to the result as a top-level dependency")
-          (cdids, new DependencyId("local", depName, "?", null, null) :: dwmis)
-      }
-    }
+    val (classpathDepIds, depsWithoutModuleIDs) = depIdsFromClasspath(cp)
 
     val classpathDepVersions = classpathDepIds.map { id => OrgAndName(id) -> id.getVersion }.toMap
 
-    def replaceVersionIfMatches(id: DependencyId): DependencyId = {
-      classpathDepVersions.get(OrgAndName(id)) match {
-        case Some(v) if v != id.getVersion =>
-          if (ivy.getSettings.getVersionMatcher.accept(
-            ModuleRevisionId.newInstance("x", "x", id.getVersion),
-            ModuleRevisionId.newInstance("x", "x", v)
-          )) id.withVersion(v) else id
-
-        case _ => id
-      }
-    }
-
-    val classpathIdToDepIds = classpathDepIds.map { id =>
-      id -> (fdd.forDependencyId(id) match {
-        case None =>
-          log.warn(s"Cannot get dependencies for module ${id.toStr}")
-          Nil
-        case Some(ds) =>
-          val r = ds.filter { d =>
-            // include optional deps only for the root
-            val included = if (id == rootId) includedConfigs else includedConfigsWithoutOptional
-            included.intersect(d.getModuleConfigurations.toSet).nonEmpty
-          }.map(d => replaceVersionIfMatches(toDepId(d.getDependencyRevisionId)))
-          r
-      })
-    }.toMap
+    val classpathIdToDepIds = findClasspathIdToDepIds(classpathDepIds, cpCfg, classpathDepVersions)
 
     val idToDepsWithLocal = classpathIdToDepIds + (rootId -> (classpathIdToDepIds.getOrElse(rootId, Nil) ++ depsWithoutModuleIDs))
 
@@ -79,6 +41,57 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger) {
     }
 
     new ModuleDependencies(rootId, cfg.name, deps)
+  }
+
+  private def depIdsFromClasspath(cp: Classpath) = {
+    cp.foldLeft((List.empty[DependencyId], List.empty[DependencyId])) { case ((depIds, withoutModuleId), f) =>
+      f.metadata.get(moduleID.key) match {
+        case Some(mid) =>
+          // If it's a project in this build, we need the special translation which adds the scala version suffix.
+          val id = projectIdToIvyId.get(mid).map(toDepId).getOrElse(toDepId(mid))
+          (id :: depIds, withoutModuleId)
+        case None =>
+          val depName = f.data.getName
+          log.warn(s"Cannot find Ivy module ID for dependency $depName. Adding to the result as a top-level dependency")
+          (depIds, new DependencyId("local", depName, "?", null, null) :: withoutModuleId)
+      }
+    }
+  }
+
+  private def findClasspathIdToDepIds(classpathDepIds: List[DependencyId], cpCfg: Configuration,
+    classpathDepVersions: Map[OrgAndName, String]): Map[DependencyId, Seq[DependencyId]] = {
+
+    val includedConfigs = getConfigsClosure(cpCfg.name, rootMd.getConfigurations)
+    val includedConfigsWithoutOptional = includedConfigs - Configurations.Optional.name
+
+    // If a dependency's version is specified using a range, we check if the chosen version is in that range and if
+    // so, replace the version. Otherwise, it means that the dependency is evicted.
+    def replaceVersionIfMatchesCp(id: DependencyId): DependencyId = {
+      classpathDepVersions.get(OrgAndName(id)) match {
+        case Some(v) if v != id.getVersion =>
+          if (ivy.getSettings.getVersionMatcher.accept(
+            ModuleRevisionId.newInstance("x", "x", id.getVersion),
+            ModuleRevisionId.newInstance("x", "x", v)
+          )) id.withVersion(v) else id
+
+        case _ => id
+      }
+    }
+
+    classpathDepIds.map { id =>
+      id -> (fdd.forDependencyId(id) match {
+        case None =>
+          log.warn(s"Cannot get dependencies for module ${id.toStr}")
+          Nil
+        case Some(ds) =>
+          val r = ds.filter { d =>
+            // include optional deps only for the root
+            val included = if (id == rootId) includedConfigs else includedConfigsWithoutOptional
+            included.intersect(d.getModuleConfigurations.toSet).nonEmpty
+          }.map(d => replaceVersionIfMatchesCp(toDepId(d.getDependencyRevisionId)))
+          r
+      })
+    }.toMap
   }
 
   /**
