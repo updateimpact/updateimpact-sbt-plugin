@@ -20,7 +20,7 @@ object Plugin extends AutoPlugin {
     val updateImpactOpenBrowser = settingKey[Boolean]("Should the default browser be " +
       "opened with the results after the build completes")
 
-    val updateImpactBuildId = settingKey[UUID]("Unique id of this build")
+    val updateImpactBuildId = taskKey[() => String]("Create a unique id of a build")
 
     val updateImpactConfigs = settingKey[List[Configuration]]("Configurations for which to generate and submit dependencies")
 
@@ -97,7 +97,7 @@ object Plugin extends AutoPlugin {
     new DependencyReport(
       rootProjectName,
       ak,
-      buildId.value.toString,
+      buildId.value(),
       moduleDependencies.asJavaCollection,
       Collections.emptyList(),
       "1.0",
@@ -114,7 +114,7 @@ object Plugin extends AutoPlugin {
     apiKey := "",
     baseUrl := "https://app.updateimpact.com",
     openBrowser := true,
-    buildId := UUID.randomUUID(),
+    buildId := { () => UUID.randomUUID().toString },
     configs := List(Compile, Test, Runtime),
     rootProjectIdImpl,
     dependencyReportImpl,
