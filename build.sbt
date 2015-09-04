@@ -2,11 +2,11 @@ organization := "com.updateimpact"
 
 name := "updateimpact-sbt-plugin"
 
-version := "1.0.10"
+version := "2.0.0-SNAPSHOT"
 
 sbtPlugin := true
 
-libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.3.1"
+libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.3.2"
 
 // Sonatype OSS deployment
 publishTo <<= version { (v: String) =>
@@ -46,3 +46,15 @@ enablePlugins(BuildInfoPlugin)
 buildInfoPackage := "com.updateimpact"
 
 buildInfoObject := "UpdateimpactSbtBuildInfo"
+
+// Testing
+
+ScriptedPlugin.scriptedSettings
+
+scriptedLaunchOpts := { scriptedLaunchOpts.value ++
+  Seq("-Xmx1024M", "-Dplugin.version=" + version.value)
+}
+
+scriptedBufferLog := false
+
+scriptedRun <<= scriptedRun dependsOn publishLocal

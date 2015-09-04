@@ -26,6 +26,10 @@ object Plugin extends AutoPlugin {
 
     val updateImpactRootProjectId = taskKey[String]("The id of the root project, from which the name and apikeys are taken")
 
+    val updateImpactDependencies = taskKey[List[ModuleDependencies]]("Compute module dependencies for a single project")
+
+    val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
+
     val updateImpactSubmit = taskKey[Unit]("Submit the dependency report to UpdateImpact for all projects " +
       "and optionally open the browser with the results")
   }
@@ -36,10 +40,9 @@ object Plugin extends AutoPlugin {
   val buildId = autoImport.updateImpactBuildId
   val configs = autoImport.updateImpactConfigs
   val rootProjectId = autoImport.updateImpactRootProjectId
+  val dependencies = autoImport.updateImpactDependencies
+  val dependencyReport = autoImport.updateImpactDependencyReport
   val submit = autoImport.updateImpactSubmit
-
-  val dependencies = taskKey[List[ModuleDependencies]]("Compute module dependencies for a single project")
-  val dependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
   // We need a mapping from SBT's ModuleIDs, where for the projects in the build the artifact names do not contain
   // the _2.11 (scala version) suffix, to the artifact name that is used in Ivy (with the suffix)

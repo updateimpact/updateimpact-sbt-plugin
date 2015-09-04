@@ -88,7 +88,7 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
     classpathDepIds.map { id =>
       id -> (fdd.forDependencyId(id) match {
         case None =>
-          log.warn(s"Cannot get dependencies for module ${id.toStr}")
+          log.warn(s"Cannot get dependencies for module $id")
           Nil
         case Some(ds) =>
           val r = ds.filter { d =>
@@ -131,7 +131,6 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
   private def toDepId(mid: ModuleID): DependencyId = new DependencyId(mid.organization, mid.name, mid.revision, null, null)
 
   private implicit class RichDependencyId(id: DependencyId) {
-    def toStr = s"${id.getGroupId}:${id.getArtifactId}:${id.getVersion}:${id.getType}:${id.getClassifier}"
     def withVersion(v: String) = new DependencyId(id.getGroupId, id.getArtifactId, v, id.getType, id.getClassifier)
   }
 }
