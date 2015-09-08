@@ -90,7 +90,7 @@ object Plugin extends AutoPlugin {
       case Some((_, chld)) => chld.map(c => Node(c, Option(depsMap.get(c).map(_._1.getEvictedByVersion).orNull)))
     }
 
-    AsciiTree.create(
+    Graph.toAscii(
       Node(md.getModuleId),
       getChildNodes,
       (_: Node).toString
