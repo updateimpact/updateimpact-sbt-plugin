@@ -4,6 +4,7 @@ import java.awt.Desktop
 import java.net.URI
 import java.util.{Collections, UUID}
 
+import com.updateimpact.ascii.AsciiTree
 import com.updateimpact.report._
 import org.apache.ivy.core.module.id.ModuleRevisionId
 import sbt._
@@ -22,11 +23,13 @@ object Plugin extends AutoPlugin {
 
     val updateImpactBuildId = taskKey[() => String]("Create a unique id of a build")
 
-    val updateImpactConfigs = settingKey[List[Configuration]]("Configurations for which to generate and submit dependencies")
-
     val updateImpactRootProjectId = taskKey[String]("The id of the root project, from which the name and apikeys are taken")
 
-    val updateImpactDependencies = taskKey[List[ModuleDependencies]]("Compute module dependencies for a single project")
+    val updateImpactDependencies = taskKey[ModuleDependencies]("Compute module dependencies for a single project in a given configuration")
+
+    val updateImpactAsciiTree = taskKey[String]("Generate a textual (string) representation of the dependency tree")
+
+    val updateImpactTree = taskKey[Unit]("Print the textual representation of the dependency tree to the console")
 
     val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
 
@@ -38,9 +41,12 @@ object Plugin extends AutoPlugin {
   val baseUrl = autoImport.updateImpactBaseUrl
   val openBrowser = autoImport.updateImpactOpenBrowser
   val buildId = autoImport.updateImpactBuildId
-  val configs = autoImport.updateImpactConfigs
   val rootProjectId = autoImport.updateImpactRootProjectId
+
   val dependencies = autoImport.updateImpactDependencies
+  val asciiTree = autoImport.updateImpactAsciiTree
+  val tree = autoImport.updateImpactTree
+
   val dependencyReport = autoImport.updateImpactDependencyReport
   val submit = autoImport.updateImpactSubmit
 
@@ -56,11 +62,7 @@ object Plugin extends AutoPlugin {
     projectIdToIvyIdEntry.all(ScopeFilter(inAnyProject)).value.toMap
   }
 
-  private val cfgWithCp = Def.taskDyn {
-    val cfgs = configs.value
-    Def.task { (configuration.value, classpathConfiguration.value, fullClasspath.value) }
-      .all(ScopeFilter(configurations = inConfigurations(cfgs: _*)))
-  }
+  val configs = List(Compile, Test, Runtime)
 
   val dependenciesImpl = dependencies := {
     val log = streams.value.log
@@ -69,14 +71,33 @@ object Plugin extends AutoPlugin {
 
     ivySbt.value.withIvy(log) { ivy =>
       val cmd = new CreateModuleDependencies(ivy, log, md, pitii)
-
-      (for {
-        (cfg, cpCfg, cp) <- cfgWithCp.value
-      } yield {
-          cmd.forClasspath(cfg, cpCfg, cp)
-        }).toList
+      cmd.forClasspath(configuration.value, classpathConfiguration.value, fullClasspath.value)
     }
   }
+
+  val asciiTreeImpl = asciiTree := {
+    case class Node(id: DependencyId, evictedBy: Option[String] = None) {
+      override def toString = s"${id.getGroupId}:${id.getArtifactId}:${id.getVersion}" +
+        evictedBy.fold("")(e => s" (evicted by $e)")
+    }
+
+    val md = dependencies.value
+
+    val depsMap = md.getDependencies.asScala.map { d => d.getId -> (d, d.getChildren.asScala) }.toMap
+
+    def getChildNodes(n: Node) = depsMap.get(n.id) match {
+      case None => Nil
+      case Some((_, chld)) => chld.map(c => Node(c, Option(depsMap.get(c).map(_._1.getEvictedByVersion).orNull)))
+    }
+
+    AsciiTree.create(
+      Node(md.getModuleId),
+      getChildNodes,
+      (_: Node).toString
+    )
+  }
+
+  val treeImpl = tree := streams.value.log.info(asciiTree.value)
 
   val rootProjectIdImpl = rootProjectId := {
     // Trying to find the "root project" using a heuristic: from all the projects that aggregate other projects,
@@ -95,7 +116,7 @@ object Plugin extends AutoPlugin {
       .find(_._1.id == rootProjectId.value)
     if (ak == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
 
-    val moduleDependencies = dependencies.all(ScopeFilter(inAnyProject)).value.flatten
+    val moduleDependencies = dependencies.all(ScopeFilter(inAnyProject, configurations = inConfigurations(configs: _*))).value
 
     new DependencyReport(
       rootProjectName,
@@ -108,17 +129,15 @@ object Plugin extends AutoPlugin {
   }
 
   override def projectSettings = Seq(
-    dependenciesImpl,
     projectIdToIvyIdEntryImpl,
     projectIdToIvyIdImpl
-  )
+  ) ++ configs.flatMap(c => inConfig(c)(Seq(dependenciesImpl, asciiTreeImpl, treeImpl)))
 
   override def buildSettings = Seq(
     apiKey := "",
     baseUrl := "https://app.updateimpact.com",
     openBrowser := true,
     buildId := { () => UUID.randomUUID().toString },
-    configs := List(Compile, Test, Runtime),
     rootProjectIdImpl,
     dependencyReportImpl,
     submit := {
