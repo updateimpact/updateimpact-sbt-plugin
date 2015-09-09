@@ -2,19 +2,18 @@ package com.updateimpact
 
 import com.updateimpact.report.{Dependency, ModuleDependencies, DependencyId}
 import org.apache.ivy.Ivy
-import org.apache.ivy.core.module.descriptor.ModuleDescriptor
+import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg, DependencyDescriptor, ModuleDescriptor}
 import org.apache.ivy.core.module.id.ModuleRevisionId
 import sbt.Keys._
-import sbt.{Configurations, Configuration, ModuleID, Logger}
+import sbt._
 import scala.collection.JavaConversions._
-import org.apache.ivy.core.module.descriptor.{Configuration => IvyCfg}
 
 class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
-  projectIdToIvyId: Map[ModuleID, ModuleRevisionId]) {
+  projectIdToIvyId: Map[ModuleID, ModuleRevisionId], updateReport: UpdateReport) {
 
   val LocalGroupId = "local"
 
-  private val fdd = new FindDependencyDescriptors(ivy)
+  private val fmi = new FindModuleInfo(ivy)
   private val rootId = toDepId(rootMd.getModuleRevisionId)
 
   def forClasspath(cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
@@ -85,26 +84,89 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
       }
     }
 
+    var moduleInfoCache = classpathDepIds.map { id =>
+      id -> (fmi.forDependencyId(id) match {
+        case None =>
+          log.warn(s"Cannot get dependencies for module $id")
+          None
+        case s => s
+      })
+    }.toMap
+    def getModuleInfo(id: DependencyId): Option[(ModuleDescriptor, Seq[DependencyDescriptor])] =
+      moduleInfoCache.get(id) match {
+        case Some(r) => r
+        case None =>
+          val info = fmi.forDependencyId(id)
+          moduleInfoCache += id -> info
+          info
+      }
+
+    // Map from id of a dependency to the configurations in which it is included
+    var depsCfgs: Map[DependencyId, Set[String]] = Map(rootId -> includedConfigs.toSet)
+
+    // Pattern for extracting Ivy configuration mappings with a fallback
+    val FallbackConfig = """(.*)\((.*)\)""".r
+
+    /**
+     * For the given dependency and id, resolves the config specification to a list of valid configuration
+     * names of the dependency. The specification can be a fallback, * or config name
+     */
+    def resolveConfig(id: DependencyId, cfgSpec: String): Set[String] = {
+      val cfgs = getModuleInfo(id).map(_._1.getConfigurations.toSet).getOrElse(Set())
+      lazy val cfgNames = cfgs.map(_.getName)
+
+      (cfgSpec match {
+        case FallbackConfig(default, fallback) =>
+          if (cfgNames.contains(default)) Set(default) else { if (cfgNames.contains(fallback)) Set(fallback) else Set() }
+        case "*" => cfgNames - "optional"
+        case _ => Set(cfgSpec)
+      }).flatMap((cfg: String) => getConfigsClosure(cfg, cfgs))
+    }
+
+    def doPropagateCfgs(id: DependencyId): Unit = {
+      val cfgs = depsCfgs.getOrElse(id, Set())
+      val cfgsArray = cfgs.toArray
+
+      val deps = getModuleInfo(id).map(_._2).getOrElse(Nil)
+      var changed = Set.empty[DependencyId]
+
+      deps.foreach { dep =>
+        val depId = toDepId(dep.getDependencyRevisionId)
+        val depCfgs = dep.getDependencyConfigurations(cfgsArray).toSet.flatMap(resolveConfig(depId, _: String))
+
+        val current = depsCfgs.getOrElse(depId, Set())
+        val modified = current ++ depCfgs
+
+        if (modified.size > current.size) {
+          depsCfgs += depId -> modified
+          changed += depId
+        }
+      }
+
+      changed.foreach(doPropagateCfgs)
+    }
+
+    doPropagateCfgs(rootId)
+
     classpathDepIds.map { id =>
-      id -> (fdd.forDependencyId(id) match {
+      id -> (fmi.forDependencyId(id) match {
         case None =>
           log.warn(s"Cannot get dependencies for module $id")
           Nil
-        case Some(ds) =>
+        case Some((desc, ds)) =>
           val r = ds.filter { d =>
-            // include optional deps only for the root
-            val included = if (id == rootId) includedConfigs else includedConfigsWithoutOptional
-            included.intersect(d.getModuleConfigurations.toSet).nonEmpty
+            depsCfgs.get(toDepId(d.getDependencyRevisionId)).exists(_.nonEmpty)
           }.map(d => replaceVersionIfMatchesCp(toDepId(d.getDependencyRevisionId)))
           r
       })
     }.toMap
   }
 
+
   /**
    * Set of configurations closed under "extends" relation
    */
-  private def getConfigsClosure(root: String, cfgs: Seq[IvyCfg]): Set[String] = {
+  private def getConfigsClosure(root: String, cfgs: Iterable[IvyCfg]): Set[String] = {
     cfgs.find(_.getName == root) match {
       case None => Set()
       case Some(cfg) =>

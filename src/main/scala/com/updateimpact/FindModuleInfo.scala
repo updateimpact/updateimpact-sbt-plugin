@@ -6,18 +6,18 @@ import java.util.Properties
 import com.updateimpact.report.DependencyId
 import org.apache.ivy.Ivy
 import org.apache.ivy.core.LogOptions
-import org.apache.ivy.core.module.descriptor.DependencyDescriptor
+import org.apache.ivy.core.module.descriptor.{ModuleDescriptor, DependencyDescriptor}
 import org.apache.ivy.core.module.id.ModuleRevisionId
 import org.apache.ivy.core.resolve.ResolveOptions
 import org.apache.ivy.plugins.parser.xml.XmlModuleDescriptorParser
 
-class FindDependencyDescriptors(ivy: Ivy) {
+class FindModuleInfo(ivy: Ivy) {
   /**
-   * Looks for dependencies of the given dependency in:
+   * Looks for module info of the given dependency in:
    * - resolved ivy module file, in a local cache
    * - ivy cache
    */
-  def forDependencyId(id: DependencyId): Option[Seq[DependencyDescriptor]] = {
+  def forDependencyId(id: DependencyId): Option[(ModuleDescriptor, Seq[DependencyDescriptor])] = {
     val mrid = ModuleRevisionId.newInstance(id.getGroupId, id.getArtifactId, id.getVersion)
     findModuleFromCache(mrid)
       .orElse(findModuleUsingResolveEngine(mrid))
@@ -36,14 +36,14 @@ class FindDependencyDescriptors(ivy: Ivy) {
       val desc = XmlModuleDescriptorParser.getInstance().parseDescriptor(ivy.getSettings, ivyFile.toURI.toURL, false)
       val revReplacements = resolvedRevisionsFromCachedProperties(mrid)
 
-      val result = desc.getDependencies.map { d =>
+      val deps = desc.getDependencies.map { d =>
         revReplacements.get(d.getDependencyRevisionId) match {
           case None => d
           case Some(rev) => d.clone(ModuleRevisionId.newInstance(d.getDependencyRevisionId, rev))
         }
       }
 
-      Some(result.toSeq)
+      Some((desc, deps.toSeq))
     }
   }
 
@@ -86,6 +86,7 @@ class FindDependencyDescriptors(ivy: Ivy) {
     resolveOptions.setUseCacheOnly(true)
     resolveOptions.setValidate(false)
 
-    Option(ivy.getResolveEngine.findModule(mrid, resolveOptions)).map(_.getDescriptor.getDependencies.toSeq)
+    Option(ivy.getResolveEngine.findModule(mrid, resolveOptions))
+      .map(fmr => (fmr.getDescriptor, fmr.getDescriptor.getDependencies.toSeq))
   }
 }

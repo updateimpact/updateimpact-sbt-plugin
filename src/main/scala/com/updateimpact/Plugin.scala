@@ -4,7 +4,6 @@ import java.awt.Desktop
 import java.net.URI
 import java.util.{Collections, UUID}
 
-import com.updateimpact.ascii.AsciiTree
 import com.updateimpact.report._
 import org.apache.ivy.core.module.id.ModuleRevisionId
 import sbt._
@@ -68,10 +67,12 @@ object Plugin extends AutoPlugin {
     val log = streams.value.log
     val md = ivyModule.value.moduleDescriptor(log)
     val pitii = projectIdToIvyId.value
+    val cfg = configuration.value
+    val ur = update.value
 
     ivySbt.value.withIvy(log) { ivy =>
-      val cmd = new CreateModuleDependencies(ivy, log, md, pitii)
-      cmd.forClasspath(configuration.value, classpathConfiguration.value, fullClasspath.value)
+      val cmd = new CreateModuleDependencies(ivy, log, md, pitii, ur)
+      cmd.forClasspath(cfg, classpathConfiguration.value, fullClasspath.value)
     }
   }
 
@@ -87,7 +88,9 @@ object Plugin extends AutoPlugin {
 
     def getChildNodes(n: Node) = depsMap.get(n.id) match {
       case None => Nil
-      case Some((_, chld)) => chld.map(c => Node(c, Option(depsMap.get(c).map(_._1.getEvictedByVersion).orNull)))
+      case Some((_, chld)) => chld
+        .map(c => Node(c, Option(depsMap.get(c).map(_._1.getEvictedByVersion).orNull)))
+        .sortBy(_.toString)
     }
 
     Graph.toAscii(
