@@ -114,10 +114,14 @@ object Plugin extends AutoPlugin {
   }
 
   val dependencyReportImpl = dependencyReport := {
-    val Some((_, (rootProjectName, ak))) = thisProject.zip(name.zip(apiKey))
+    val Some((_, (rootProjectName, ak0))) = thisProject.zip(name.zip(apiKey))
       .all(ScopeFilter(inAnyProject)).value
       .find(_._1.id == rootProjectId.value)
-    if (ak == "") throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com")
+
+    val ak = if (ak0 == "") {
+      sys.env.getOrElse("UPDATEIMPACT_API_KEY",
+        throw new IllegalStateException("Please define the api key. You can find it on UpdateImpact.com"))
+    } else ak0
 
     val moduleDependencies = dependencies.all(ScopeFilter(inAnyProject, configurations = inConfigurations(configs: _*))).value
 
