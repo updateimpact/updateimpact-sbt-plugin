@@ -51,7 +51,8 @@ com.softwaremill.example:module2_2.11:0.1-SNAPSHOT in compile
 com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT in compile
    com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT
       org.scala-lang:scala-library:2.11.6
-   org.scala-lang:scala-library:2.11.6com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in runtime
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in runtime
    com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
       commons-logging:commons-logging:1.2
       dom4j:dom4j:1.6.1
@@ -102,7 +103,8 @@ com.softwaremill.example:module2_2.11:0.1-SNAPSHOT in runtime
 com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT in runtime
    com.softwaremill.example:sbt-example_2.11:0.1-SNAPSHOT
       org.scala-lang:scala-library:2.11.6
-   org.scala-lang:scala-library:2.11.6com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in test
+   org.scala-lang:scala-library:2.11.6
+com.softwaremill.example:module1_2.11:0.1-SNAPSHOT in test
    com.softwaremill.example:module1_2.11:0.1-SNAPSHOT
       commons-logging:commons-logging:1.2
       dom4j:dom4j:1.6.1
