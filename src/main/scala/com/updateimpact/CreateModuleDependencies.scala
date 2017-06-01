@@ -18,7 +18,8 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
 
   def forClasspath(cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
 
-    val (classpathDepIds, depsWithoutModuleIDs) = depIdsFromClasspath(cfg, cp)
+    val (depsWithModuleIds, depsWithoutModuleIDs) = depIdsFromClasspath(cfg, cp)
+    val classpathDepIds = rootId :: depsWithModuleIds
 
     val classpathDepVersions = classpathDepIds.map { id => OrgAndName(id) -> id.getVersion }.toMap
 
