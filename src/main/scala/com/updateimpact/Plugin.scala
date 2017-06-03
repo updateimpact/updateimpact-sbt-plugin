@@ -72,7 +72,7 @@ object Plugin extends AutoPlugin {
 
     ivySbt.value.withIvy(log) { ivy =>
       val cmd = new CreateModuleDependencies(ivy, log, md, pitii, ur)
-      cmd.forClasspath(cfg, classpathConfiguration.value, fullClasspath.value)
+      cmd.forClasspath(cfg, classpathConfiguration.value, dependencyClasspath.value)
     }
   }
 

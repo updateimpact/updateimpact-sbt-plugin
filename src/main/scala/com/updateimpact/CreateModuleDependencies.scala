@@ -18,7 +18,8 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
 
   def forClasspath(cfg: Configuration, cpCfg: Configuration, cp: Classpath): ModuleDependencies = {
 
-    val (classpathDepIds, depsWithoutModuleIDs) = depIdsFromClasspath(cfg, cp)
+    val (depsWithModuleIds, depsWithoutModuleIDs) = depIdsFromClasspath(cfg, cp)
+    val classpathDepIds = rootId :: depsWithModuleIds
 
     val classpathDepVersions = classpathDepIds.map { id => OrgAndName(id) -> id.getVersion }.toMap
 
@@ -92,7 +93,7 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
         case s => s
       })
     }.toMap
-    def getModuleInfo(id: DependencyId): Option[(ModuleDescriptor, Seq[DependencyDescriptor])] =
+    def getIvyModuleInfo(id: DependencyId): Option[(ModuleDescriptor, Seq[DependencyDescriptor])] =
       moduleInfoCache.get(id) match {
         case Some(r) => r
         case None =>
@@ -102,7 +103,7 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
       }
 
     // Map from id of a dependency to the configurations in which it is included
-    var depsCfgs: Map[DependencyId, Set[String]] = Map(rootId -> includedConfigs.toSet)
+    var depsToConfigsMap: Map[DependencyId, Set[String]] = Map(rootId -> includedConfigs.toSet)
 
     // Pattern for extracting Ivy configuration mappings with a fallback
     val FallbackConfig = """(.*)\((.*)\)""".r
@@ -111,35 +112,33 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
      * For the given dependency and id, resolves the config specification to a list of valid configuration
      * names of the dependency. The specification can be a fallback, * or config name
      */
-    def resolveConfig(id: DependencyId, cfgSpec: String): Set[String] = {
-      val cfgs = getModuleInfo(id).map(_._1.getConfigurations.toSet).getOrElse(Set())
-      lazy val cfgNames = cfgs.map(_.getName)
+    def resolveConfig(dependency: DependencyId, configName: String): Set[String] = {
+      val configs = getIvyModuleInfo(dependency).map(_._1.getConfigurations.toSet).getOrElse(Set())
+      lazy val configNames = configs.map(_.getName)
 
-      (cfgSpec match {
+      (configName match {
         case FallbackConfig(default, fallback) =>
-          if (cfgNames.contains(default)) Set(default) else { if (cfgNames.contains(fallback)) Set(fallback) else Set() }
-        case "*" => cfgNames - "optional"
-        case _ => Set(cfgSpec)
-      }).flatMap((cfg: String) => getConfigsClosure(cfg, cfgs))
+          if (configNames.contains(default)) Set(default) else { if (configNames.contains(fallback)) Set(fallback) else Set() }
+        case "*" => configNames - "optional"
+        case _ => Set(configName)
+      }).flatMap((cfg: String) => getConfigsClosure(cfg, configs))
     }
 
     def doPropagateCfgs(id: DependencyId): Unit = {
-      val cfgs = depsCfgs.getOrElse(id, Set())
-      val cfgsArray = cfgs.toArray
+      val dependencyConfigs = depsToConfigsMap.getOrElse(id, Set()).toArray
 
-      val deps = getModuleInfo(id).map(_._2).getOrElse(Nil)
+      val subDependenciesIvyDescriptors = getIvyModuleInfo(id).map(_._2).getOrElse(Nil)
       var changed = Set.empty[DependencyId]
 
-      deps.foreach { dep =>
-        val depId = toDepId(dep.getDependencyRevisionId)
-        val depCfgs = dep.getDependencyConfigurations(cfgsArray).toSet.flatMap(resolveConfig(depId, _: String))
+      subDependenciesIvyDescriptors.foreach { subDependencyDescriptor =>
+        val subDependency = toDepId(subDependencyDescriptor.getDependencyRevisionId)
+        val ivySubDependencyConfigs = subDependencyDescriptor.getDependencyConfigurations(dependencyConfigs).toSet.flatMap(resolveConfig(subDependency, _: String))
+        val subDependencyConfigs = depsToConfigsMap.getOrElse(subDependency, Set())
+        val mergedSubDependencyConfigs = subDependencyConfigs ++ ivySubDependencyConfigs
 
-        val current = depsCfgs.getOrElse(depId, Set())
-        val modified = current ++ depCfgs
-
-        if (modified.size > current.size) {
-          depsCfgs += depId -> modified
-          changed += depId
+        if (mergedSubDependencyConfigs.size > subDependencyConfigs.size) {
+          depsToConfigsMap += subDependency -> mergedSubDependencyConfigs
+          changed += subDependency
         }
       }
 
@@ -155,7 +154,7 @@ class CreateModuleDependencies(ivy: Ivy, log: Logger, rootMd: ModuleDescriptor,
           Nil
         case Some((desc, ds)) =>
           val r = ds.filter { d =>
-            depsCfgs.get(toDepId(d.getDependencyRevisionId)).exists(_.nonEmpty)
+            depsToConfigsMap.get(toDepId(d.getDependencyRevisionId)).exists(_.nonEmpty)
           }.map(d => replaceVersionIfMatchesCp(toDepId(d.getDependencyRevisionId)))
           r
       })

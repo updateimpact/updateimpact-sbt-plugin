@@ -2,7 +2,7 @@ organization := "com.updateimpact"
 
 name := "updateimpact-sbt-plugin"
 
-version := "2.1.1"
+version := "2.1.6"
 
 sbtPlugin := true
 
