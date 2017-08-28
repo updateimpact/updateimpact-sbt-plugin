@@ -6,6 +6,8 @@ version := "2.1.2"
 
 sbtPlugin := true
 
+crossSbtVersions := Vector("0.13.16", "1.0.0")
+
 libraryDependencies += "com.updateimpact" % "updateimpact-plugin-common" % "1.3.2"
 
 // Sonatype OSS deployment

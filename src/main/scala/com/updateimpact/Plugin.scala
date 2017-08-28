@@ -26,8 +26,6 @@ object Plugin extends AutoPlugin {
 
     val updateImpactDependencies = taskKey[ModuleDependencies]("Compute module dependencies for a single project in a given configuration")
 
-    val updateImpactAsciiTree = taskKey[String]("Generate a textual (string) representation of the dependency tree")
-
     val updateImpactTree = taskKey[Unit]("Print the textual representation of the dependency tree to the console")
 
     val updateImpactDependencyReport = taskKey[DependencyReport]("Create the dependency report for all of the projects")
@@ -43,7 +41,6 @@ object Plugin extends AutoPlugin {
   val rootProjectId = autoImport.updateImpactRootProjectId
 
   val dependencies = autoImport.updateImpactDependencies
-  val asciiTree = autoImport.updateImpactAsciiTree
   val tree = autoImport.updateImpactTree
 
   val dependencyReport = autoImport.updateImpactDependencyReport
@@ -69,38 +66,14 @@ object Plugin extends AutoPlugin {
     val pitii = projectIdToIvyId.value
     val cfg = configuration.value
     val ur = update.value
+    val cc = classpathConfiguration.value
+    val dc = dependencyClasspath.value
 
     ivySbt.value.withIvy(log) { ivy =>
       val cmd = new CreateModuleDependencies(ivy, log, md, pitii, ur)
-      cmd.forClasspath(cfg, classpathConfiguration.value, dependencyClasspath.value)
+      cmd.forClasspath(cfg, cc, dc)
     }
   }
-
-  val asciiTreeImpl = asciiTree := {
-    case class Node(id: DependencyId, evictedBy: Option[String] = None) {
-      override def toString = s"${id.getGroupId}:${id.getArtifactId}:${id.getVersion}" +
-        evictedBy.fold("")(e => s" (evicted by $e)")
-    }
-
-    val md = dependencies.value
-
-    val depsMap = md.getDependencies.asScala.map { d => d.getId -> (d, d.getChildren.asScala) }.toMap
-
-    def getChildNodes(n: Node) = depsMap.get(n.id) match {
-      case None => Nil
-      case Some((_, chld)) => chld
-        .map(c => Node(c, Option(depsMap.get(c).map(_._1.getEvictedByVersion).orNull)))
-        .sortBy(_.toString)
-    }
-
-    Graph.toAscii(
-      Node(md.getModuleId),
-      getChildNodes,
-      (_: Node).toString
-    )
-  }
-
-  val treeImpl = tree := streams.value.log.info(asciiTree.value)
 
   val rootProjectIdImpl = rootProjectId := {
     // Trying to find the "root project" using a heuristic: from all the projects that aggregate other projects,
@@ -138,7 +111,7 @@ object Plugin extends AutoPlugin {
   override def projectSettings = Seq(
     projectIdToIvyIdEntryImpl,
     projectIdToIvyIdImpl
-  ) ++ configs.flatMap(c => inConfig(c)(Seq(dependenciesImpl, asciiTreeImpl, treeImpl)))
+  ) ++ configs.flatMap(c => inConfig(c)(Seq(dependenciesImpl)))
 
   override def buildSettings = Seq(
     apiKey := "",
@@ -154,8 +127,9 @@ object Plugin extends AutoPlugin {
         override def info(message: String) = slog.info(message)
       }
       val dr = dependencyReport.value
+      val ob = openBrowser.value
       Option(new ReportSubmitter(baseUrl.value, log).trySubmitReport(dr)).foreach { viewLink =>
-        if (openBrowser.value) {
+        if (ob) {
           log.info("Trying to open the report in the default browser ... " +
             "(you can disable this by setting `updateImpactOpenBrowser in ThisBuild` to false)")
           openWebpage(viewLink)
